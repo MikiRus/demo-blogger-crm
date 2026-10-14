@@ -1,0 +1,24 @@
+{
+  "name": "crm-demo-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "nuxt": "^4.6.1",
+    "vue": "^3.5.44",
+    "vue-chartjs": "^5.3.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.9.3",
+    "vue-tsc": "^3.3.13"
+  }
+}

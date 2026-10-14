@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Onest", ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #16181d;
+  --color-muted: #5d6470;
+  --color-line: #e4e7ec;
+  --color-canvas: #f6f7f9;
+  --color-brand: #5b3fd9;
+  --color-brand-soft: #efebff;
+  --color-good: #1f8a4c;
+  --color-good-soft: #e5f5ec;
+  --color-warn: #b45309;
+  --color-warn-soft: #fdf1e3;
+  --color-bad: #c2362b;
+  --color-bad-soft: #fde9e7;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+}
+
+.card {
+  @apply rounded-2xl border border-line bg-white;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50;
+}
+/* Используются вместе с .btn: class="btn btn-primary" */
+.btn-primary {
+  @apply bg-brand text-white hover:bg-[#4a30c2];
+}
+.btn-ghost {
+  @apply border border-line bg-white text-ink hover:bg-canvas;
+}
+
+.input {
+  @apply w-full rounded-xl border border-line bg-white px-3 py-2 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft;
+}
+
+.table-base {
+  @apply w-full text-sm;
+}
+.table-base th {
+  @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted;
+}
+.table-base td {
+  @apply border-t border-line px-4 py-3;
+}

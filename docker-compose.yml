@@ -1,0 +1,61 @@
+name: blogger-crm-demo
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: crm
+    # Демо пересоздаёт данные при старте, поэтому том не нужен.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+
+  api:
+    build: ./api
+    command: ["api"]
+    environment:
+      DATABASE_URL: postgres://crm:crm@postgres:5432/crm?sslmode=disable
+      DEMO_RESET: "true"
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/readyz"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+  worker:
+    build: ./api
+    command: ["worker"]
+    environment:
+      DATABASE_URL: postgres://crm:crm@postgres:5432/crm?sslmode=disable
+      WORKER_EVERY: 20s
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 64M }
+
+  web:
+    build: ./web
+    environment:
+      NUXT_API_BASE: http://api:8080
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
