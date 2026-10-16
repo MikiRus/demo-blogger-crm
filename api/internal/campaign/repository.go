@@ -116,6 +116,50 @@ func (r *Repository) Get(ctx context.Context, id int64) (Details, error) {
 	return d, err
 }
 
+// ListIntegrations — все интеграции с продажами, свежие публикации первыми.
+func (r *Repository) ListIntegrations(ctx context.Context, f IntegrationFilter) ([]IntegrationListItem, int64, error) {
+	where := "TRUE"
+	args := []any{f.Limit, f.Offset}
+	if f.Status != "" {
+		args = append(args, f.Status)
+		where += fmt.Sprintf(" AND i.status = $%d", len(args))
+	}
+	if f.Query != "" {
+		args = append(args, "%"+f.Query+"%")
+		where += fmt.Sprintf(" AND (b.name ILIKE $%[1]d OR b.handle ILIKE $%[1]d OR i.promo_code ILIKE $%[1]d)", len(args))
+	}
+	rows, err := r.pool.Query(ctx, fmt.Sprintf(`
+		WITH sales AS (
+		    SELECT integration_id, SUM(revenue_rub)::bigint AS revenue, SUM(orders)::bigint AS orders
+		    FROM integration_metrics GROUP BY integration_id
+		)
+		SELECT i.id, b.id, b.name, b.handle, p.code, i.publish_date::text, i.promo_code, i.utm_campaign, i.status,
+		       i.cost_rub, COALESCE(s.revenue, 0), COALESCE(s.orders, 0), c.id, c.title, COUNT(*) OVER ()
+		FROM integrations i
+		JOIN bloggers b ON b.id = i.blogger_id
+		JOIN platforms p ON p.id = b.platform_id
+		JOIN campaigns c ON c.id = i.campaign_id
+		LEFT JOIN sales s ON s.integration_id = i.id
+		WHERE %s
+		ORDER BY i.publish_date DESC, i.id DESC
+		LIMIT $1 OFFSET $2`, where), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	var total int64
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (IntegrationListItem, error) {
+		var (
+			it                    IntegrationListItem
+			cost, revenue, orders int64
+		)
+		err := row.Scan(&it.ID, &it.BloggerID, &it.Blogger, &it.Handle, &it.Platform, &it.PublishDate,
+			&it.PromoCode, &it.UTM, &it.Status, &cost, &revenue, &orders, &it.CampaignID, &it.Campaign, &total)
+		it.Totals = metrics.NewTotals(cost, revenue, orders)
+		return it, err
+	})
+	return items, total, err
+}
+
 func (r *Repository) Create(ctx context.Context, in CreateInput, start, end time.Time, status string) (int64, error) {
 	var id int64
 	err := r.pool.QueryRow(ctx, `

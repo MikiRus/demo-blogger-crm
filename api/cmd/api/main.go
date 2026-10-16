@@ -18,8 +18,9 @@ import (
 	"crmdemo/internal/config"
 	"crmdemo/internal/db"
 	"crmdemo/internal/httpx"
-	"crmdemo/internal/report"
+	"crmdemo/internal/ozon"
 	"crmdemo/internal/seed"
+	"crmdemo/internal/user"
 )
 
 func main() {
@@ -49,7 +50,8 @@ func run(log *slog.Logger) error {
 			st, err := seed.Run(ctx, pool, time.Now())
 			if err == nil {
 				log.Info("demo data seeded", "bloggers", st.Bloggers, "campaigns", st.Campaigns,
-					"integrations", st.Integrations, "metric_rows", st.MetricRows)
+					"integrations", st.Integrations, "metric_rows", st.MetricRows,
+					"ozon_reports", st.OzonReports, "users", st.Users)
 			}
 			return err
 		}); err != nil {
@@ -101,7 +103,8 @@ func newRouter(pool *pgxpool.Pool, log *slog.Logger, corsOrigin string) http.Han
 	blogger.NewHandler(blogger.NewRepository(pool), log).Register(mux)
 	campaign.NewHandler(campaign.NewRepository(pool), log).Register(mux)
 	analytics.NewHandler(analytics.NewRepository(pool), log).Register(mux)
-	report.NewHandler(report.NewRepository(pool), log).Register(mux)
+	ozon.NewHandler(ozon.NewRepository(pool), log).Register(mux)
+	user.NewHandler(pool, log).Register(mux)
 
 	return httpx.Chain(mux, httpx.Recover(log), httpx.Logger(log), httpx.CORS(corsOrigin))
 }

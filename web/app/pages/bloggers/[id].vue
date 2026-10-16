@@ -12,14 +12,14 @@ const { data: b, error } = await useFetch<BloggerDetails>(() => `/api/bloggers/$
 
     <template v-else-if="b">
       <PageHeader :title="b.name" :subtitle="`@${b.handle} · ${b.platform.name} · ${b.category}`">
-        <RoasBadge :roas="b.roas" />
+        <DrrBadge :drr="b.drr" />
       </PageHeader>
 
       <section class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard label="Подписчики" :value="formatNumber(b.followers)" :hint="`охват поста ≈ ${formatCompact(b.avgReach)}`" />
         <KpiCard label="Потрачено" :value="formatRub(b.costRub)" :hint="`${b.integrations} интеграций`" />
         <KpiCard label="Выручка" :value="formatRub(b.revenueRub)" :hint="`${formatNumber(b.orders)} заказов`" />
-        <KpiCard label="ДРР" :value="formatPercent(b.drr)" />
+        <KpiCard label="ДРР" :value="formatPercent(b.drr)" hint="доля рекламных расходов в выручке" />
       </section>
 
       <div class="card overflow-hidden">
@@ -27,7 +27,7 @@ const { data: b, error } = await useFetch<BloggerDetails>(() => `/api/bloggers/$
         <div class="overflow-x-auto">
           <table class="table-base mt-2 min-w-[680px]">
             <thead>
-              <tr><th>Кампания</th><th>Дата</th><th>Промокод</th><th class="text-right">Расходы</th><th class="text-right">Выручка</th><th class="text-right">ROAS</th></tr>
+              <tr><th>Кампания</th><th>Дата</th><th>Промокод</th><th class="text-right">Расходы</th><th class="text-right">Выручка</th><th class="cursor-help text-right" :title="DRR_HINT">ДРР</th></tr>
             </thead>
             <tbody>
               <tr v-for="h in b.history" :key="h.id" class="hover:bg-canvas">
@@ -39,7 +39,7 @@ const { data: b, error } = await useFetch<BloggerDetails>(() => `/api/bloggers/$
                 <td><code class="rounded bg-canvas px-1.5 py-0.5 text-xs">{{ h.promoCode }}</code></td>
                 <td class="text-right tabular-nums">{{ formatRub(h.costRub) }}</td>
                 <td class="text-right tabular-nums">{{ formatRub(h.revenueRub) }}</td>
-                <td class="text-right"><RoasBadge :roas="h.roas" /></td>
+                <td class="text-right"><DrrBadge :drr="h.drr" /></td>
               </tr>
               <tr v-if="!b.history.length"><td colspan="6" class="py-10 text-center text-muted">Интеграций пока не было</td></tr>
             </tbody>

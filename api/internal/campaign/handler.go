@@ -3,6 +3,7 @@ package campaign
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"crmdemo/internal/httpx"
@@ -23,6 +24,30 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/campaigns/{id}", h.get)
 	mux.HandleFunc("POST /api/campaigns", h.create)
 	mux.HandleFunc("POST /api/campaigns/{id}/integrations", h.addIntegration)
+	mux.HandleFunc("GET /api/integrations", h.integrations)
+}
+
+func (h *Handler) integrations(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	f := IntegrationFilter{
+		Status: q.Get("status"),
+		Query:  strings.TrimSpace(q.Get("q")),
+		Limit:  httpx.QueryInt(r, "limit", 20, 1, 100),
+		Offset: httpx.QueryInt(r, "offset", 0, 0, 1_000_000),
+	}
+	if f.Status != "" && f.Status != "planned" && f.Status != "published" {
+		httpx.Error(w, http.StatusBadRequest, "status: planned | published")
+		return
+	}
+	items, total, err := h.repo.ListIntegrations(r.Context(), f)
+	if err != nil {
+		httpx.Fail(w, h.log, err)
+		return
+	}
+	if items == nil {
+		items = []IntegrationListItem{}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 }
 
 func (h *Handler) today() time.Time {

@@ -13,8 +13,8 @@ const data = computed(() => ({
     { type: 'bar' as const, label: 'Расходы', data: props.monthly.map((m) => m.costRub), backgroundColor: '#c9bff5', borderRadius: 6, yAxisID: 'y' },
     { type: 'bar' as const, label: 'Выручка', data: props.monthly.map((m) => m.revenueRub), backgroundColor: '#5b3fd9', borderRadius: 6, yAxisID: 'y' },
     {
-      type: 'line' as const, label: 'ROAS', data: props.monthly.map((m) => m.roas), borderColor: '#e8860c', backgroundColor: '#e8860c',
-      tension: 0.35, pointRadius: 3, yAxisID: 'roas',
+      type: 'line' as const, label: 'ДРР', data: props.monthly.map((m) => m.drr), borderColor: '#e8860c', backgroundColor: '#e8860c',
+      tension: 0.35, pointRadius: 3, yAxisID: 'drr',
     },
   ],
 }))
@@ -28,8 +28,8 @@ const options = {
     tooltip: {
       callbacks: {
         label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) =>
-          ctx.dataset.label === 'ROAS'
-            ? ` ROAS: ${formatRoas(ctx.parsed.y)}`
+          ctx.dataset.label === 'ДРР'
+            ? ` ДРР: ${formatPercent(ctx.parsed.y)}`
             : ` ${ctx.dataset.label}: ${formatRub(ctx.parsed.y ?? 0)}`,
       },
     },
@@ -37,7 +37,7 @@ const options = {
   scales: {
     x: { grid: { display: false } },
     y: { ticks: { callback: (v: string | number) => formatCompactRub(Number(v)) }, grid: { color: '#eef0f3' } },
-    roas: { position: 'right' as const, grid: { display: false }, ticks: { callback: (v: string | number) => `×${v}` } },
+    drr: { position: 'right' as const, min: 0, grid: { display: false }, ticks: { callback: (v: string | number) => `${v}%` } },
   },
 }
 </script>

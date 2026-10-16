@@ -13,10 +13,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// WBLoadedThrough — отчёт WB в сиде загружен по today-4; свежие дни
-// пользователь догружает сам через XLSX (как в реальной работе с WB).
-const WBLoadedThrough = 4
-
 // SalesWindow — сколько дней после публикации интеграция приносит продажи.
 const SalesWindow = 14
 
@@ -78,7 +74,7 @@ func Run(ctx context.Context, pool *pgxpool.Pool, now time.Time) (Stats, error) 
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `TRUNCATE integration_metrics, integrations, campaigns, bloggers, platforms RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := tx.Exec(ctx, `TRUNCATE ozon_reports, users, integration_metrics, integrations, campaigns, bloggers, platforms RESTART IDENTITY CASCADE`); err != nil {
 		return Stats{}, fmt.Errorf("truncate: %w", err)
 	}
 
@@ -139,11 +135,18 @@ func Run(ctx context.Context, pool *pgxpool.Pool, now time.Time) (Stats, error) 
 		return Stats{}, fmt.Errorf("copy metrics: %w", err)
 	}
 	st.MetricRows = int(n)
+
+	if st.OzonReports, err = insertOzonReports(ctx, tx, rnd, metricRows, today); err != nil {
+		return Stats{}, fmt.Errorf("ozon reports: %w", err)
+	}
+	if st.Users, err = insertUsers(ctx, tx, now); err != nil {
+		return Stats{}, fmt.Errorf("users: %w", err)
+	}
 	return st, tx.Commit(ctx)
 }
 
 type Stats struct {
-	Bloggers, Campaigns, Integrations, MetricRows int
+	Bloggers, Campaigns, Integrations, MetricRows, OzonReports, Users int
 }
 
 func insertBloggers(ctx context.Context, tx pgx.Tx, rnd *rand.Rand, platformIDs []int16) ([]blogger, error) {
@@ -160,7 +163,7 @@ func insertBloggers(ctx context.Context, tx pgx.Tx, rnd *rand.Rand, platformIDs 
 		followers := int(math.Exp(math.Log(15_000) + rnd.Float64()*(math.Log(1_500_000)-math.Log(15_000))))
 		reach := int(float64(followers) * (0.08 + rnd.Float64()*0.27))
 		pi := rnd.IntN(len(platforms))
-		b := blogger{Platform: pi, Reach: reach, Quality: 0.25 + rnd.Float64()*1.9}
+		b := blogger{Platform: pi, Reach: reach, Quality: 0.4 + rnd.Float64()*1.7}
 
 		name := firstNames[rnd.IntN(len(firstNames))] + " " + lastInitials[rnd.IntN(len(lastInitials))]
 		err := tx.QueryRow(ctx, `
@@ -236,23 +239,19 @@ func planCampaigns(rnd *rand.Rand, today time.Time) []campaignPlan {
 }
 
 // salesRows — продажи интеграции по дням: пик в день публикации и затухание.
-// ozon и site — по вчера (сегодня их «докачивает» воркер), wb — по today-4.
+// Всё — по вчера: сегодняшние продажи ozon и site «докачивает» воркер.
 func salesRows(rnd *rand.Rand, id int64, b blogger, p product, publish, today time.Time) [][]any {
-	expected := float64(b.Reach) * 0.0003 * b.Quality * (11_000 / float64(p.PriceRub+3_000))
+	expected := float64(b.Reach) * 0.00045 * b.Quality * (11_000 / float64(p.PriceRub+3_000))
 	share := map[string]float64{"ozon": 0.45, "wb": 0.35, "site": 0.20}
 	var rows [][]any
 	for k := 0; k < SalesWindow; k++ {
 		day := publish.AddDate(0, 0, k)
 		weekday := platforms[b.Platform].Weekday[(int(day.Weekday())+6)%7]
 		decay := math.Exp(-float64(k)/3) * 0.31
+		if !day.Before(today) {
+			break
+		}
 		for _, src := range []string{"ozon", "wb", "site"} {
-			limit := today.AddDate(0, 0, -1)
-			if src == "wb" {
-				limit = today.AddDate(0, 0, -WBLoadedThrough)
-			}
-			if day.After(limit) {
-				continue
-			}
 			mean := expected * decay * weekday * share[src]
 			orders := int(math.Round(mean * (0.6 + rnd.Float64()*0.8)))
 			price := float64(p.PriceRub) * (0.88 + rnd.Float64()*0.17)

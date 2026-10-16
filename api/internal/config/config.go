@@ -21,7 +21,7 @@ func Load() Config {
 		HTTPAddr:    env("HTTP_ADDR", ":8080"),
 		DatabaseURL: env("DATABASE_URL", "postgres://crm:crm@localhost:5432/crm?sslmode=disable"),
 		DemoReset:   envBool("DEMO_RESET", true),
-		WorkerEvery: envDuration("WORKER_EVERY", 20*time.Second),
+		WorkerEvery: envDuration("WORKER_EVERY", 30*time.Second),
 		CORSOrigin:  env("CORS_ORIGIN", "*"),
 	}
 }

@@ -3,7 +3,6 @@ export interface Totals {
   revenueRub: number
   orders: number
   drr: number | null
-  roas: number | null
 }
 
 export interface Platform {
@@ -76,25 +75,45 @@ export interface Summary {
   bySource: { source: string; orders: number; revenueRub: number }[]
 }
 
-export type RowStatus = 'new' | 'duplicate' | 'unknown_promo' | 'invalid'
+export interface IntegrationListItem extends CampaignIntegration {
+  campaignId: number
+  campaign: string
+}
 
-export interface ReportRow {
-  line: number
+export type OzonStatus = 'queued' | 'processing' | 'success' | 'error'
+
+export interface OzonReport {
   day: string
-  promoCode: string
-  source: string
+  reportId: string
+  status: OzonStatus
+  trigger: 'schedule' | 'manual'
+  attempts: number
+  rowsTotal: number
   orders: number
   revenueRub: number
-  error?: string
+  error: string | null
+  requestedAt: string
+  finishedAt: string | null
 }
 
-export interface PreviewRow extends ReportRow {
-  status: RowStatus
-  integrationId?: number
-  blogger?: string
+export interface OzonLine {
+  integrationId: number
+  promoCode: string
+  bloggerId: number
+  blogger: string
+  campaignId: number
+  campaign: string
+  orders: number
+  revenueRub: number
 }
 
-export interface Preview {
-  rows: PreviewRow[]
-  summary: Record<RowStatus, number>
+export type UserRole = 'admin' | 'marketer' | 'manager' | 'analyst' | 'finance'
+
+export interface User {
+  id: number
+  name: string
+  email: string
+  role: UserRole
+  status: 'active' | 'invited' | 'blocked'
+  lastSeenAt: string | null
 }

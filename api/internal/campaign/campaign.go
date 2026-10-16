@@ -41,6 +41,20 @@ type Integration struct {
 	metrics.Totals
 }
 
+// IntegrationListItem — интеграция в общем списке, вместе с кампанией.
+type IntegrationListItem struct {
+	Integration
+	CampaignID int64  `json:"campaignId"`
+	Campaign   string `json:"campaign"`
+}
+
+type IntegrationFilter struct {
+	Status string // planned | published | "" — все
+	Query  string // блогер, ник или промокод
+	Limit  int
+	Offset int
+}
+
 type DayPoint struct {
 	Day        string `json:"day"`
 	Orders     int64  `json:"orders"`

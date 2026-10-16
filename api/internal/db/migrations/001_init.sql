@@ -42,7 +42,7 @@ CREATE INDEX integrations_campaign_idx ON integrations (campaign_id);
 CREATE INDEX integrations_blogger_idx ON integrations (blogger_id);
 
 -- Дневные продажи по интеграции в разрезе источника.
--- ozon и site (CRM) подтягивает воркер, wb загружается отчётом XLSX.
+-- ozon и site (CRM) подтягивает воркер.
 CREATE TABLE integration_metrics (
     integration_id bigint NOT NULL REFERENCES integrations (id) ON DELETE CASCADE,
     day            date   NOT NULL,

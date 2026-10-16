@@ -35,12 +35,11 @@ const { data: platforms } = await useFetch<Platform[]>('/api/platforms', { defau
     </PageHeader>
 
     <div v-if="summary" class="space-y-6" :class="{ 'opacity-60 transition-opacity': status === 'pending' }">
-      <section class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard label="Расходы на блогеров" :value="formatRub(summary.total.costRub)" />
         <KpiCard label="Выручка" :value="formatRub(summary.total.revenueRub)" />
         <KpiCard label="Заказы" :value="formatNumber(summary.total.orders)" />
-        <KpiCard label="ДРР" :value="formatPercent(summary.total.drr)" hint="доля расходов в выручке" />
-        <KpiCard label="ROAS" :value="formatRoas(summary.total.roas)" hint="выручка на 1 ₽ рекламы" />
+        <KpiCard label="ДРР" :value="formatPercent(summary.total.drr)" hint="доля рекламных расходов в выручке" />
       </section>
 
       <section class="grid gap-6 lg:grid-cols-3">
@@ -60,7 +59,7 @@ const { data: platforms } = await useFetch<Platform[]>('/api/platforms', { defau
           <div class="overflow-x-auto">
             <table class="table-base mt-2">
               <thead>
-                <tr><th>Блогер</th><th class="text-right">Расходы</th><th class="text-right">Выручка</th><th class="text-right">ROAS</th></tr>
+                <tr><th>Блогер</th><th class="text-right">Расходы</th><th class="text-right">Выручка</th><th class="cursor-help text-right" :title="DRR_HINT">ДРР</th></tr>
               </thead>
               <tbody>
                 <tr v-for="b in summary.topBloggers" :key="b.id" class="hover:bg-canvas">
@@ -70,7 +69,7 @@ const { data: platforms } = await useFetch<Platform[]>('/api/platforms', { defau
                   </td>
                   <td class="text-right tabular-nums">{{ formatRub(b.costRub) }}</td>
                   <td class="text-right tabular-nums">{{ formatRub(b.revenueRub) }}</td>
-                  <td class="text-right"><RoasBadge :roas="b.roas" /></td>
+                  <td class="text-right"><DrrBadge :drr="b.drr" /></td>
                 </tr>
               </tbody>
             </table>

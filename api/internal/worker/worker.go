@@ -1,11 +1,14 @@
-// Package worker имитирует фоновые интеграции: забирает «отчёт Ozon»
+// Package worker имитирует фоновые интеграции: скачивает «отчёт Ozon»
 // и «заказы из CRM» за сегодня и раскладывает продажи по интеграциям.
 // Внешних API нет — цифры генерируются, но шаги и логи повторяют реальный процесс.
+//
+// Отчёты Ozon идут через очередь в таблице ozon_reports: расписание и кнопка
+// в интерфейсе только ставят день в очередь, а забирает его этот воркер.
 package worker
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"math/rand/v2"
 	"time"
@@ -13,8 +16,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"crmdemo/internal/ozon"
 	"crmdemo/internal/seed"
 )
+
+// queuePoll — как часто воркер проверяет очередь отчётов.
+const queuePoll = 2 * time.Second
 
 type Worker struct {
 	pool  *pgxpool.Pool
@@ -37,23 +44,45 @@ func New(pool *pgxpool.Pool, log *slog.Logger, every time.Duration) *Worker {
 
 func (w *Worker) Run(ctx context.Context) {
 	w.log.Info("worker started", "every", w.every.String())
-	ticker := time.NewTicker(w.every)
-	defer ticker.Stop()
+	schedule := time.NewTicker(w.every)
+	defer schedule.Stop()
+	poll := time.NewTicker(queuePoll)
+	defer poll.Stop()
 
-	jobs := []func(context.Context) error{w.pullOzon, w.pullCRM}
-	for i := 0; ; i++ {
-		if err := w.publishDue(ctx); err != nil {
-			w.log.Error("publish due integrations", "err", err)
-		}
-		if err := jobs[i%len(jobs)](ctx); err != nil && ctx.Err() == nil {
-			w.log.Error("job failed", "err", err)
-		}
+	w.scheduled(ctx)
+	for {
 		select {
 		case <-ctx.Done():
 			w.log.Info("worker stopped")
 			return
-		case <-ticker.C:
+		case <-schedule.C:
+			w.scheduled(ctx)
+		case <-poll.C:
 		}
+		// Разбираем очередь до конца: ручной запуск не ждёт следующего тика.
+		for {
+			done, err := w.processOzon(ctx)
+			if err != nil && ctx.Err() == nil {
+				w.log.Error("ozon report failed", "err", err)
+			}
+			if done || err != nil {
+				break
+			}
+		}
+	}
+}
+
+// scheduled — плановые задачи: публикация интеграций, заказы сайта
+// и постановка сегодняшнего отчёта Ozon в очередь.
+func (w *Worker) scheduled(ctx context.Context) {
+	if err := w.publishDue(ctx); err != nil {
+		w.log.Error("publish due integrations", "err", err)
+	}
+	if err := ozon.Enqueue(ctx, w.pool, w.today(), "schedule"); err != nil && !errors.Is(err, ozon.ErrBusy) {
+		w.log.Error("enqueue ozon report", "err", err)
+	}
+	if err := w.pullCRM(ctx); err != nil && ctx.Err() == nil {
+		w.log.Error("crm job failed", "err", err)
 	}
 }
 
@@ -121,28 +150,73 @@ func (w *Worker) sleep(ctx context.Context) error {
 	}
 }
 
-// pullOzon повторяет реальный флоу: отчёт заказывается асинхронно,
-// статус опрашивается, потом файл разбирается и раскладывается по промокодам.
-func (w *Worker) pullOzon(ctx context.Context) error {
-	log := w.log.With("job", "ozon")
-	reportID := fmt.Sprintf("rpt-%06d", w.rnd.IntN(1_000_000))
-	log.Info("отчёт по источникам трафика запрошен", "report_id", reportID)
+// processOzon забирает из очереди один отчёт и повторяет реальный флоу:
+// отчёт заказывается асинхронно, статус опрашивается, потом файл разбирается
+// и раскладывается по промокодам. done=true — очередь пуста.
+func (w *Worker) processOzon(ctx context.Context) (done bool, err error) {
+	var (
+		day      time.Time
+		reportID string
+	)
+	// SKIP LOCKED: несколько воркеров не возьмут один и тот же день.
+	err = w.pool.QueryRow(ctx, `
+		UPDATE ozon_reports SET status = 'processing', attempts = attempts + 1
+		WHERE day = (SELECT day FROM ozon_reports WHERE status = 'queued'
+		             ORDER BY requested_at LIMIT 1 FOR UPDATE SKIP LOCKED)
+		RETURNING day, report_id`).Scan(&day, &reportID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	log := w.log.With("job", "ozon", "report_id", reportID, "day", day.Format(time.DateOnly))
+	log.Info("отчёт по продажам запрошен")
 	for _, status := range []string{"waiting", "processing", "success"} {
 		if err := w.sleep(ctx); err != nil {
-			return err
+			return false, w.failOzon(day, "загрузка прервана: воркер остановлен")
 		}
-		log.Info("статус отчёта", "report_id", reportID, "status", status)
+		// Иногда Ozon отвечает 429 — день останется с ошибкой, расписание повторит.
+		if status == "processing" && w.rnd.IntN(12) == 0 {
+			log.Warn("Ozon ответил 429, повторим по расписанию")
+			return false, w.failOzon(day, "Ozon API: 429 Too Many Requests")
+		}
+		log.Info("статус отчёта", "status", status)
 	}
-	items, err := w.liveIntegrations(ctx)
-	if err != nil {
-		return err
+
+	rows := 0
+	if day.Equal(w.today()) {
+		items, err := w.liveIntegrations(ctx)
+		if err != nil {
+			return false, errors.Join(err, w.failOzon(day, "не удалось разобрать отчёт"))
+		}
+		var matched int
+		if rows, matched, err = w.addSales(ctx, items, "ozon", 0.45); err != nil {
+			return false, errors.Join(err, w.failOzon(day, "не удалось записать продажи"))
+		}
+		log.Info("отчёт разобран", "rows", rows, "matched_promo", matched, "unmatched", rows-matched)
 	}
-	rows, matched, err := w.addSales(ctx, items, "ozon", 0.45)
-	if err != nil {
-		return err
-	}
-	log.Info("отчёт разобран", "rows", rows, "matched_promo", matched, "unmatched", rows-matched)
-	return nil
+
+	// Итоги дня пересчитываются из integration_metrics, а не суммируются,
+	// поэтому журнал всегда сходится с тем, что видно в аналитике.
+	_, err = w.pool.Exec(ctx, `
+		UPDATE ozon_reports r SET status = 'success', finished_at = now(),
+		       rows_total = r.rows_total + $2, orders = s.orders, revenue_rub = s.revenue
+		FROM (SELECT COALESCE(SUM(orders), 0)::int AS orders, COALESCE(SUM(revenue_rub), 0)::bigint AS revenue
+		      FROM integration_metrics WHERE day = $1 AND source = 'ozon') s
+		WHERE r.day = $1`, day, rows)
+	return false, err
+}
+
+// failOzon помечает отчёт ошибкой. Контекст отдельный: при остановке воркера
+// день не должен навсегда застрять в processing.
+func (w *Worker) failOzon(day time.Time, msg string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := w.pool.Exec(ctx, `
+		UPDATE ozon_reports SET status = 'error', error = $2, finished_at = now() WHERE day = $1`, day, msg)
+	return err
 }
 
 func (w *Worker) pullCRM(ctx context.Context) error {

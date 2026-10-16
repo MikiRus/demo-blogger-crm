@@ -16,13 +16,13 @@ func TestBuildMonthly(t *testing.T) {
 	if out[0].DRR != nil {
 		t.Errorf("июль без выручки: DRR должен быть nil")
 	}
-	if out[1].ROAS != nil {
-		t.Errorf("август без расходов: ROAS должен быть nil")
+	if out[1].DRR == nil || *out[1].DRR != 0 {
+		t.Errorf("август без расходов: DRR должен быть 0, got %v", out[1].DRR)
 	}
 	if total.CostRub != 150_000 || total.RevenueRub != 1_200_000 || total.Orders != 160 {
 		t.Fatalf("total: %+v", total)
 	}
-	if *total.DRR != 12.5 || *total.ROAS != 8 {
-		t.Errorf("total ratios: drr=%v roas=%v", *total.DRR, *total.ROAS)
+	if *total.DRR != 12.5 {
+		t.Errorf("total drr=%v", *total.DRR)
 	}
 }

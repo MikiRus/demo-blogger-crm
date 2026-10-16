@@ -6,6 +6,8 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: false },
   css: ['~/assets/css/main.css'],
+  // Старый адрес загрузки WB-отчёта.
+  routeRules: { '/reports': { redirect: '/ozon' } },
   vite: { plugins: [tailwindcss()] },
   runtimeConfig: {
     // NUXT_API_BASE — адрес Go API, виден только серверу Nitro.

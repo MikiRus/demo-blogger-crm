@@ -44,7 +44,7 @@ const budgetUsed = (c: CampaignItem) => (c.budgetRub ? Math.min(100, Math.round(
         <dl class="grid grid-cols-3 gap-3 text-sm">
           <div><dt class="text-xs text-muted">Расходы</dt><dd class="font-medium tabular-nums">{{ formatCompactRub(c.costRub) }}</dd></div>
           <div><dt class="text-xs text-muted">Выручка</dt><dd class="font-medium tabular-nums">{{ formatCompactRub(c.revenueRub) }}</dd></div>
-          <div><dt class="text-xs text-muted">ROAS</dt><dd><RoasBadge :roas="c.roas" /></dd></div>
+          <div><dt class="cursor-help text-xs text-muted" :title="DRR_HINT">ДРР</dt><dd><DrrBadge :drr="c.drr" /></dd></div>
         </dl>
         <div class="mt-4">
           <div class="mb-1 flex justify-between text-xs text-muted">

@@ -47,12 +47,11 @@ function closeAdd() {
         </div>
       </PageHeader>
 
-      <section class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <section class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <KpiCard label="Бюджет" :value="formatRub(c.budgetRub)" />
         <KpiCard label="Потрачено" :value="formatRub(c.costRub)" />
         <KpiCard label="Выручка" :value="formatRub(c.revenueRub)" :hint="`${formatNumber(c.orders)} заказов`" />
-        <KpiCard label="ДРР" :value="formatPercent(c.drr)" />
-        <KpiCard label="ROAS" :value="formatRoas(c.roas)" />
+        <KpiCard label="ДРР" :value="formatPercent(c.drr)" hint="доля рекламных расходов в выручке" />
       </section>
 
       <div v-if="c.daily.length" class="card mb-6 p-5">
@@ -65,7 +64,7 @@ function closeAdd() {
         <div class="overflow-x-auto">
           <table class="table-base mt-2 min-w-[760px]">
             <thead>
-              <tr><th>Блогер</th><th>Публикация</th><th>Промокод / UTM</th><th class="text-right">Стоимость</th><th class="text-right">Выручка</th><th class="text-right">ROAS</th></tr>
+              <tr><th>Блогер</th><th>Публикация</th><th>Промокод / UTM</th><th class="text-right">Стоимость</th><th class="text-right">Выручка</th><th class="cursor-help text-right" :title="DRR_HINT">ДРР</th></tr>
             </thead>
             <tbody>
               <tr v-for="i in c.integrationList" :key="i.id" class="hover:bg-canvas">
@@ -85,7 +84,7 @@ function closeAdd() {
                 </td>
                 <td class="text-right tabular-nums">{{ formatRub(i.costRub) }}</td>
                 <td class="text-right tabular-nums">{{ formatRub(i.revenueRub) }}</td>
-                <td class="text-right"><RoasBadge :roas="i.roas" /></td>
+                <td class="text-right"><DrrBadge :drr="i.drr" /></td>
               </tr>
             </tbody>
           </table>

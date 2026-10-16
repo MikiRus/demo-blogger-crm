@@ -54,9 +54,10 @@ type ListFilter struct {
 }
 
 // sortColumns — белый список сортировок: в ORDER BY попадает только отсюда.
+// ДРР сортируется по возрастанию (ниже — лучше), блогеры без выручки — в конце.
 var sortColumns = map[string]string{
 	"revenue":   "revenue DESC, b.id",
-	"roas":      "revenue::float8 / NULLIF(cost, 0) DESC NULLS LAST, b.id",
+	"drr":       "cost::float8 / NULLIF(revenue, 0) NULLS LAST, b.id",
 	"followers": "b.followers DESC, b.id",
 	"name":      "b.name, b.id",
 }

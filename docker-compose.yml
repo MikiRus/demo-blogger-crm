@@ -41,7 +41,7 @@ services:
     command: ["worker"]
     environment:
       DATABASE_URL: postgres://crm:crm@postgres:5432/crm?sslmode=disable
-      WORKER_EVERY: 20s
+      WORKER_EVERY: 30s
     depends_on:
       api: { condition: service_healthy }
     deploy:

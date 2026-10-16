@@ -34,7 +34,7 @@ const showCreate = ref(false)
       <label class="sr-only" for="sort">Сортировка</label>
       <select id="sort" v-model="sort" class="input sm:w-48">
         <option value="revenue">По выручке</option>
-        <option value="roas">По ROAS</option>
+        <option value="drr">По ДРР (ниже — лучше)</option>
         <option value="followers">По подписчикам</option>
         <option value="name">По имени</option>
       </select>
@@ -46,7 +46,7 @@ const showCreate = ref(false)
           <thead>
             <tr>
               <th>Блогер</th><th>Площадка</th><th class="text-right">Подписчики</th><th class="text-right">Интеграций</th>
-              <th class="text-right">Расходы</th><th class="text-right">Выручка</th><th class="text-right">ROAS</th>
+              <th class="text-right">Расходы</th><th class="text-right">Выручка</th><th class="cursor-help text-right" :title="DRR_HINT">ДРР</th>
             </tr>
           </thead>
           <tbody>
@@ -64,7 +64,7 @@ const showCreate = ref(false)
               <td class="text-right tabular-nums">{{ b.integrations }}</td>
               <td class="text-right tabular-nums">{{ formatRub(b.costRub) }}</td>
               <td class="text-right tabular-nums">{{ formatRub(b.revenueRub) }}</td>
-              <td class="text-right"><RoasBadge :roas="b.roas" /></td>
+              <td class="text-right"><DrrBadge :drr="b.drr" /></td>
             </tr>
             <tr v-if="data && !data.items.length">
               <td colspan="7" class="py-10 text-center text-muted">Никого не нашли</td>
